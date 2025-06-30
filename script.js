@@ -26,9 +26,8 @@ async function runPrediction() {
   const closePrices = rawData.map(d => parseFloat(d[4]));
   const timeStamps = rawData.map(d => new Date(d[0]).toLocaleTimeString());
 
-  const priceStart = closePrices[0];
   const priceNow = closePrices[closePrices.length - 1];
-  const trendPerMin = (priceNow - priceStart) / (closePrices.length - 1);
+  const trendPerMin = (priceNow - closePrices[0]) / (closePrices.length - 1);
   const predictedTrend = trendPerMin * minutesAhead;
   let predictedPrice = priceNow + predictedTrend;
 
@@ -36,64 +35,57 @@ async function runPrediction() {
   const rsi14 = calculateRSI(closePrices.slice(-15));
   const emaTrend = ema9 - closePrices[closePrices.length - 10];
 
-  // 🎯 Adjust prediction using RSI + EMA trend reversals
   if (rsi14 > 80) predictedPrice -= 25;
   else if (rsi14 < 20) predictedPrice += 25;
-
   if (trendPerMin > 0 && emaTrend < 0) predictedPrice -= 20;
   else if (trendPerMin < 0 && emaTrend > 0) predictedPrice += 20;
 
   const prediction = predictedPrice >= targetPrice ? "Yes ✅" : "No ❌";
 
-  // 🎯 Confidence with better dynamic logic
   let avgChange = 0;
   for (let i = 1; i < closePrices.length; i++) {
     avgChange += Math.abs(closePrices[i] - closePrices[i - 1]);
   }
   avgChange /= (closePrices.length - 1);
 
+  const trendStrength = Math.abs(trendPerMin * 100);
   const stability = 1 - avgChange / priceNow;
-  const trendStrength = Math.abs(trendPerMin * 1000);
-  let rawScore = trendStrength * stability;
+  let rawScore = trendStrength * stability * 100;
 
-  if (trendStrength < 5) rawScore -= 20;       // very weak trend
-  if (stability < 0.95) rawScore -= 10;        // choppy market
-
-  // 👇 Penalty if likely reversal
+  if (trendStrength < 1) rawScore -= 40;
+  if (stability < 0.96) rawScore -= 20;
   if ((rsi14 > 80 && trendPerMin > 0 && emaTrend < 0) ||
       (rsi14 < 20 && trendPerMin < 0 && emaTrend > 0)) {
-    rawScore -= 15;
+    rawScore -= 25;
   }
 
-  let confidence = Math.max(40, Math.min(99, rawScore.toFixed(0)));
+  let confidence = Math.max(30, Math.min(99, rawScore.toFixed(0)));
 
-  // 💬 RSI Signal Description
   let signal = "Neutral ⚖️";
   if (rsi14 > 70) signal = "Overbought 📉 – Downtrend Risk";
   else if (rsi14 < 30) signal = "Oversold 📈 – Rebound Possible";
 
-  // 💬 Human-readable explanation
   let explanation = `📊 Recent trend is ${trendPerMin >= 0 ? "upward 📈" : "downward 📉"}. `;
   explanation += `EMA is ${ema9.toFixed(2)}, ${emaTrend >= 0 ? "rising" : "falling"} suggesting ${emaTrend >= 0 ? "support" : "weakness"}. `;
   explanation += `RSI = ${rsi14.toFixed(2)}, so market is ${signal.toLowerCase()}. `;
-  explanation += `Prediction adjusted based on momentum & trend reversal detection.`
+  explanation += `Prediction adjusted based on momentum & trend reversal detection.`;
 
-  // 📋 Output
   document.getElementById("result").innerHTML = `
     <p><b>Current Price:</b> ${priceNow.toFixed(2)} USDT</p>
     <p><b>Predicted Price @ ${targetTime.toLocaleTimeString()}:</b> ${predictedPrice.toFixed(2)} USDT</p>
-    <p><b>Prediction:</b> ${prediction}</p>
-    <p><b>Confidence:</b> ${confidence}%</p>
+    <p><b>Prediction:</b> <span class="${prediction.includes('Yes') ? 'prediction-yes' : 'prediction-no'}">${prediction}</span></p>
+    <p class="confidence"><b>Confidence:</b> ${confidence}%</p>
     <hr>
     <p><b>EMA (9):</b> ${ema9.toFixed(2)}</p>
-    <p><b>RSI (14):</b> ${rsi14.toFixed(2)} – ${signal}</p>
+    <p><b>RSI (14):</b> ${rsi14.toFixed(2)} – 
+      <span class="${rsi14 > 70 ? 'rsi-overbought' : rsi14 < 30 ? 'rsi-oversold' : ''}">${signal}</span>
+    </p>
     <hr>
     <p><b>Explanation:</b><br>📈 ${explanation}</p>
     <hr>
     <canvas id="sparklineChart" height="50"></canvas>
   `;
 
-  // 📊 Render Sparkline
   if (chart) chart.destroy();
   chart = new Chart(document.getElementById("sparklineChart"), {
     type: "line",
@@ -114,7 +106,6 @@ async function runPrediction() {
   });
 }
 
-// === Utility Functions ===
 function calculateEMA(prices, period = 9) {
   const k = 2 / (period + 1);
   let ema = prices[0];
