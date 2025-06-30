@@ -1,6 +1,16 @@
-document.getElementById("predictForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+let chart; // sparkline chart reference
 
+document.getElementById("predictForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  runPrediction();
+  setInterval(() => {
+    const price = document.getElementById("targetPrice").value;
+    const time = document.getElementById("targetTime").value;
+    if (price && time) runPrediction();
+  }, 10000); // every 10 seconds
+});
+
+async function runPrediction() {
   const targetPrice = parseFloat(document.getElementById("targetPrice").value);
   const targetTime = new Date(document.getElementById("targetTime").value);
   const now = new Date();
@@ -14,6 +24,7 @@ document.getElementById("predictForm").addEventListener("submit", async (e) => {
   const res = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=30");
   const rawData = await res.json();
   const closePrices = rawData.map(d => parseFloat(d[4]));
+  const timeStamps = rawData.map(d => new Date(d[0]).toLocaleTimeString());
 
   const priceStart = closePrices[0];
   const priceNow = closePrices[closePrices.length - 1];
@@ -28,7 +39,7 @@ document.getElementById("predictForm").addEventListener("submit", async (e) => {
   if (rsi14 > 70) signal = "Overbought 📉 – Downtrend Risk";
   else if (rsi14 < 30) signal = "Oversold 📈 – Rebound Possible";
 
-  // ✅ Option 2 Confidence Logic
+  // Option 2 confidence
   let avgChange = 0;
   for (let i = 1; i < closePrices.length; i++) {
     avgChange += Math.abs(closePrices[i] - closePrices[i - 1]);
@@ -38,6 +49,14 @@ document.getElementById("predictForm").addEventListener("submit", async (e) => {
   const trendStrength = Math.abs(trendPerMin * 1000);
   const confidence = Math.min(99, Math.max(60, (trendStrength * stability).toFixed(2)));
 
+  // Explanation
+  let explanation = `📊 Trend over last 30 minutes is ${
+    trendPerMin >= 0 ? "upward 📈" : "downward 📉"
+  }. `;
+  explanation += `RSI is ${rsi14.toFixed(2)}, indicating ${signal.split("–")[0].trim().toLowerCase()}.`;
+  explanation += `\nPrediction made using projected price based on this trend.`
+
+  // Update result
   document.getElementById("result").innerHTML = `
     <p><b>Current Price:</b> ${priceNow.toFixed(2)} USDT</p>
     <p><b>Predicted Price @ ${targetTime.toLocaleTimeString()}:</b> ${predictedPrice.toFixed(2)} USDT</p>
@@ -46,10 +65,34 @@ document.getElementById("predictForm").addEventListener("submit", async (e) => {
     <hr>
     <p><b>EMA (9):</b> ${ema9.toFixed(2)}</p>
     <p><b>RSI (14):</b> ${rsi14.toFixed(2)} – ${signal}</p>
+    <hr>
+    <p><b>Explanation:</b><br>${explanation}</p>
+    <canvas id="sparklineChart" height="50"></canvas>
   `;
-});
 
-// EMA Calculation
+  // Update Sparkline
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("sparklineChart"), {
+    type: "line",
+    data: {
+      labels: timeStamps,
+      datasets: [{
+        label: 'BTC/USDT',
+        data: closePrices,
+        fill: false,
+        borderColor: "#1e90ff",
+        tension: 0.3,
+        pointRadius: 0
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { x: { display: false }, y: { display: false } },
+    }
+  });
+}
+
+// === Utils ===
 function calculateEMA(prices, period = 9) {
   const k = 2 / (period + 1);
   let ema = prices[0];
@@ -59,7 +102,6 @@ function calculateEMA(prices, period = 9) {
   return ema;
 }
 
-// RSI Calculation
 function calculateRSI(prices, period = 14) {
   if (prices.length < period + 1) return 50;
   let gains = 0, losses = 0;
