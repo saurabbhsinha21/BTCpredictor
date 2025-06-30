@@ -28,13 +28,21 @@ document.getElementById("predictForm").addEventListener("submit", async (e) => {
   if (rsi14 > 70) signal = "Overbought 📉 – Downtrend Risk";
   else if (rsi14 < 30) signal = "Oversold 📈 – Rebound Possible";
 
-  const confidence = Math.min(99, Math.max(60, Math.abs(trendPerMin * 500)));
+  // ✅ Option 2 Confidence Logic
+  let avgChange = 0;
+  for (let i = 1; i < closePrices.length; i++) {
+    avgChange += Math.abs(closePrices[i] - closePrices[i - 1]);
+  }
+  avgChange /= (closePrices.length - 1);
+  const stability = 1 - avgChange / priceNow;
+  const trendStrength = Math.abs(trendPerMin * 1000);
+  const confidence = Math.min(99, Math.max(60, (trendStrength * stability).toFixed(2)));
 
   document.getElementById("result").innerHTML = `
     <p><b>Current Price:</b> ${priceNow.toFixed(2)} USDT</p>
     <p><b>Predicted Price @ ${targetTime.toLocaleTimeString()}:</b> ${predictedPrice.toFixed(2)} USDT</p>
     <p><b>Prediction:</b> ${prediction}</p>
-    <p><b>Confidence:</b> ${Math.round(confidence)}%</p>
+    <p><b>Confidence:</b> ${confidence}%</p>
     <hr>
     <p><b>EMA (9):</b> ${ema9.toFixed(2)}</p>
     <p><b>RSI (14):</b> ${rsi14.toFixed(2)} – ${signal}</p>
