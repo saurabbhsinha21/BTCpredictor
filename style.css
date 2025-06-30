@@ -67,6 +67,14 @@ button:hover {
   line-height: 1.6;
 }
 
+#result p:last-of-type {
+  font-style: italic;
+  background: #f9f9f9;
+  padding: 10px 14px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
 hr {
   margin: 20px 0;
   border: none;
