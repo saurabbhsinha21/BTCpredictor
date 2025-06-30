@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>BTC/USDT Prediction Tool</title>
+  <title>BTC/USDT Prediction (Rule-Based)</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <h2>BTC/USDT Prediction (Rule-Based)</h2>
 
   <form id="predictForm">
     <label>Target Price (USDT):</label>
-    <input type="number" id="targetPrice" required><br>
+    <input type="number" id="targetPrice" required>
 
     <label>Target Time:</label>
-    <input type="datetime-local" id="targetTime" required><br>
+    <input type="datetime-local" id="targetTime" required>
 
     <button type="submit">Predict</button>
   </form>
